@@ -4,6 +4,7 @@
 
 #include "wake.h"
 
+
 #ifdef ENABLE_WAKE_HID
 
 #include <cstdio>
@@ -16,6 +17,10 @@
 #include "ps_shortcut.h"
 
 
+#ifdef ENABLE_BLE_WAKE
+#include "gap.h"
+#endif
+
 #define WAKE_KBD_INSTANCE     1
 #define WAKE_KEYCODE_F15      0x68
 // Post-resume timings tuned for "wake-and-resleep" Windows behavior: the host
@@ -27,6 +32,7 @@
 #define WAKE_KEY_UP_SETTLE_US 200000   // 200 ms between attempts (or before DONE)
 #define WAKE_REQUEST_TIMEOUT_US 5000000
 #define WAKE_KEY_ATTEMPTS     2
+
 
 #ifdef WAKE_DEBUG
 #  define WAKE_DBG(fmt, ...) printf("[wake] " fmt "\n", ##__VA_ARGS__)
@@ -55,7 +61,7 @@ typedef enum {
 } wake_state_t;
 
 static critical_section_t wake_cs;
-static volatile bool host_suspended = false;
+volatile bool host_suspended = false;
 static volatile bool host_resumed_event = false;
 static wake_state_t state = WAKE_IDLE;
 static uint64_t state_entered_us = 0;
@@ -111,6 +117,9 @@ extern "C" void tud_suspend_cb(bool remote_wakeup_en) {
              (int)remote_wakeup_en, wake_state_name(state));
     bt_power_off_controller();
     host_suspended = true;
+    #ifdef ENABLE_BLE_WAKE
+    gap_start_scan();
+    #endif
     host_resumed_event = false;
     
     // Unconditionally re-arm on suspend. If a previous wake attempt hung
@@ -137,6 +146,9 @@ void wake_on_bt_connect(void) {
 extern "C" void tud_resume_cb(void) {
     WAKE_DBG("tud_resume_cb state=%s", wake_state_name(state));
     host_suspended = false;
+    #ifdef ENABLE_BLE_WAKE
+    gap_stop_scan();
+    #endif
     host_resumed_event = true;
 }
 
