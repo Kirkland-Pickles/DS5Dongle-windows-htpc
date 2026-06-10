@@ -14,7 +14,7 @@
 #include "pico/cyw43_arch.h"
 
 constexpr uint32_t CONFIG_MAGIC = 0x66ccff00;
-constexpr uint16_t CONFIG_VERSION = 3;
+constexpr uint16_t CONFIG_VERSION = 4;
 constexpr uint32_t CONFIG_FLASH_OFFSET = PICO_FLASH_SIZE_BYTES - FLASH_SECTOR_SIZE;
 static Config config{};
 bool is_dse = false;
@@ -107,6 +107,16 @@ void config_valid() {
     if (body->ps_shortcut_enabled > 1) {
         body->ps_shortcut_enabled = 0;
         printf("[Config] ps_shortcut_enabled is invalid\n");
+    }
+    if (body->pin_enabled > 1) {
+        body->pin_enabled = 0;
+        printf("[Config] pin_enabled is invalid\n");
+    }
+    for (int i = 0; i < 4; i++) {
+        if (body->pin_digits[i] > 9) {
+            body->pin_digits[i] = 0;
+            printf("[Config] pin_digits[%d] is invalid\n", i);
+        }
     }
 }
 
