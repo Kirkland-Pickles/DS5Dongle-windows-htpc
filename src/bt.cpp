@@ -614,6 +614,7 @@ static void __not_in_flash_func(hci_packet_handler)(uint8_t packet_type, uint16_
             bt_rssi = 0;
             hid_control_cid = 0;
             hid_interrupt_cid = 0;
+            wake_on_bt_disconnect();
             gpio_on_disconnect();
             while (queue_try_remove(&send_fifo, NULL)) {
             }

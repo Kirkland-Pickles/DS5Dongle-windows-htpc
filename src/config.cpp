@@ -95,6 +95,20 @@ void config_valid() {
         body->ps_shortcut_enabled = 0;
         printf("[Config] ps_shortcut_enabled is invalid\n");
     }
+    if (body->pin_enabled > 1) {
+        body->pin_enabled = 0;
+        printf("[Config] pin_enabled is invalid\n");
+    }
+    for (int i = 0; i < 4; i++) {
+        if (body->pin_digits[i] > 9) {
+            body->pin_digits[i] = 0;
+            printf("[Config] pin_digits[%d] is invalid\n", i);
+        }
+    }
+    if (body->pin_azerty > 1) {
+        body->pin_azerty = 0;
+        printf("[Config] pin_azerty is invalid\n");
+    }
     if (body->mic_select > 3) {
         body->mic_select = 0;
         printf("[Config] mic_select is invalid\n");

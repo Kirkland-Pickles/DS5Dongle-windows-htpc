@@ -27,6 +27,9 @@ struct __attribute__((packed)) Config_body {
     uint8_t lock_volume; // bool
     uint8_t status_gpio_pin; // board-usable GPIO, 0xff: disabled
     uint8_t status_gpio_mode; // 0: high while connected, 1: button pulse on connect
+    uint8_t pin_enabled; // 0: disabled, 1: enabled
+    uint8_t pin_digits[4]; // each byte is a digit 0-9
+    uint8_t pin_azerty; // 0: QWERTY, 1: AZERTY and other nonstandard layouts
 };
 
 struct __attribute__((packed)) Config {
