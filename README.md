@@ -7,7 +7,7 @@
 > Get the build from [Releases](https://github.com/Kirkland-Pickles/DS5Dongle-windows-htpc/releases).
 > 
 > You must use the modified web config to manage these features:
-> https://kirkland-pickles.github.io/ds5dongle-config-web/
+> [https://kirkland-pickles.github.io/ds5dongle-config-web/](https://ds5dongle-config-web-five.vercel.app/)
 
 ---
 
