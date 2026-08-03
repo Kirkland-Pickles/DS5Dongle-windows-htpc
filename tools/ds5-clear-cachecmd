@@ -1,6 +1,6 @@
 :: this cmd removes stale dualSense device entries. run as admin or double click to run and grant access
 setlocal
-title ds cache cleaner
+title ds5-clear-cache
 set "SELF=%~f0"
 
 fltmc >nul 2>&1
