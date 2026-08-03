@@ -364,14 +364,9 @@ void audio_init() {
     // Mic queues are read from audio_loop on core0 every iteration, so they
     // must exist regardless of the speaker-proc build flag.
     //
-    // BUGFIX: ELASTIC BUFFER EXTENSION:
-    // Increased microphone queues to depth 8 (~80ms buffer size).
-    // This absorbs initial Opus encoder/decoder warm-up delays and mitigates
-    // startup crackling/stuttering under Core 1 task schedulers.
-    // queue_init(&mic_fifo, sizeof(mic_element), 2);
-    // queue_init(&mic_decode_fifo, sizeof(mic_decode_element), 2);
-    queue_init(&mic_fifo, sizeof(mic_element), 8);
-    queue_init(&mic_decode_fifo, sizeof(mic_decode_element), 8);
+    // BLE support leaves less heap available for Opus on core 1.
+    queue_init(&mic_fifo, sizeof(mic_element), 4);
+    queue_init(&mic_decode_fifo, sizeof(mic_decode_element), 4);
 #if !DISABLE_SPEAKER_PROC
     queue_init(&audio_fifo, sizeof(audio_raw_element), 2);
     queue_init(&audio_spk_fifo, sizeof(audio_spk_element), 2);

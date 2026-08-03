@@ -273,7 +273,7 @@ void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t rep
 
                 memcpy(outputData + 3, &state, sizeof(SetStateData));
                 bt_write(outputData, sizeof(outputData));
-#ifdef ENABLE_VERBOSE
+#if ENABLE_VERBOSE
                 printf_hexdump(outputData,sizeof(outputData));
 #endif
                 break;
@@ -297,6 +297,7 @@ int main() {
 #endif
 
     board_init();
+    config_load();
     tusb_rhport_init_t dev_init = {
         .role = TUSB_ROLE_DEVICE,
         .speed = TUSB_SPEED_FULL
@@ -304,15 +305,13 @@ int main() {
     tusb_init(BOARD_TUD_RHPORT, &dev_init);
 #if !ENABLE_SERIAL
     sleep_ms(150);
-    tud_disconnect();
+    if (!get_config().ble_wake_enabled) {
+        tud_disconnect();
+    }
 #endif
     board_init_after_tusb();
 #if ENABLE_SERIAL
     stdio_usb_init();
-    while (!stdio_usb_connected()) {
-        tud_task();
-    }
-    sleep_ms(150);
 #endif
 
     if (cyw43_arch_init()) {
@@ -346,7 +345,6 @@ int main() {
     critical_section_init(&report_cs);
     wake_init();
 
-    config_load();
     gpio_on_disconnect();
 
     bt_init();

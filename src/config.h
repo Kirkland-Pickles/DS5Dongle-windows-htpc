@@ -30,6 +30,8 @@ struct __attribute__((packed)) Config_body {
     uint8_t pin_enabled; // 0: disabled, 1: enabled
     uint8_t pin_digits[4]; // each byte is a digit 0-9
     uint8_t pin_azerty; // 0: QWERTY, 1: AZERTY and other nonstandard layouts
+    uint8_t ble_wake_enabled; // 0: disabled, 1: enabled
+    uint8_t ble_wake_mac[6]; // BLE MAC address
 };
 
 struct __attribute__((packed)) Config {

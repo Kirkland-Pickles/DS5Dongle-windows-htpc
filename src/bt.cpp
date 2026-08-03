@@ -69,6 +69,9 @@ static uint16_t hid_control_cid;
 static uint16_t hid_interrupt_cid;
 static bt_data_callback_t bt_data_callback = nullptr;
 static int8_t bt_rssi = 0;
+static bool ble_wake_scan_requested = false;
+static bool ble_wake_scan_active = false;
+static bool hci_stack_working = false;
 unordered_map<uint8_t, vector<uint8_t> > feature_data;
 queue_t send_fifo;
 
@@ -120,6 +123,40 @@ bool bt_disconnect() {
 
 bool bt_is_connected() {
     return hid_interrupt_cid != 0;
+}
+
+void bt_start_ble_wake_scan() {
+    if (!get_config().ble_wake_enabled) return;
+
+    ble_wake_scan_requested = true;
+    if (!hci_stack_working || ble_wake_scan_active) return;
+    if (acl_handle != HCI_CON_HANDLE_INVALID || bt_is_connected()) return;
+
+    if (bt_inquiring) {
+        gap_inquiry_stop();
+        bt_inquiring = false;
+    }
+    gap_connectable_control(0);
+    gap_discoverable_control(0);
+    gap_set_scan_parameters(1, 0x0030, 0x0030);
+    gap_start_scan();
+    ble_wake_scan_active = true;
+    printf("[BLE WAKE] Scanning for %s\n", bd_addr_to_str(get_config().ble_wake_mac));
+}
+
+void bt_stop_ble_wake_scan() {
+    ble_wake_scan_requested = false;
+    if (ble_wake_scan_active) {
+        gap_stop_scan();
+        ble_wake_scan_active = false;
+        printf("[BLE WAKE] Scan stopped\n");
+    }
+    if (hci_stack_working) {
+        const bool classic_connected =
+            acl_handle != HCI_CON_HANDLE_INVALID || bt_is_connected();
+        gap_connectable_control(classic_connected ? 0 : 1);
+        gap_discoverable_control(classic_connected ? 0 : 1);
+    }
 }
 
 void bt_get_signal_strength(int8_t *rssi) {
@@ -379,12 +416,30 @@ static void __not_in_flash_func(hci_packet_handler)(uint8_t packet_type, uint16_
             const uint8_t state = btstack_event_state_get_state(packet);
             printf("[BT] State: %u\n", state);
             if (state == HCI_STATE_WORKING) {
+                hci_stack_working = true;
                 gap_set_page_scan_activity(0x0012, 0x0012); // 11.25ms
                 gap_set_page_scan_type(PAGE_SCAN_MODE_INTERLACED);
                 printf("[BT] Stack ready, start inquiry\n");
                 bt_blacklist_load();
                 gap_inquiry_start(30);
                 bt_inquiring = true;
+                if (ble_wake_scan_requested) {
+                    bt_start_ble_wake_scan();
+                }
+            } else {
+                hci_stack_working = false;
+                ble_wake_scan_active = false;
+            }
+            break;
+        }
+        case GAP_EVENT_ADVERTISING_REPORT: {
+            if (!ble_wake_scan_active) break;
+
+            bd_addr_t addr;
+            gap_event_advertising_report_get_address(packet, addr);
+            if (bd_addr_cmp(addr, get_config().ble_wake_mac) == 0) {
+                printf("[BLE WAKE] Target advertisement detected: %s\n", bd_addr_to_str(addr));
+                wake_on_ble_target_detected();
             }
             break;
         }
@@ -601,12 +656,10 @@ static void __not_in_flash_func(hci_packet_handler)(uint8_t packet_type, uint16_
             // wake is on (stay on the bus so a returning controller can signal a host wake) or
             // while the host is suspended -- hiding then re-showing re-enumerates, and a USB
             // re-connect wakes a sleeping host. Defer the hide until the host is awake.
-            if (!get_config().enable_wake && !tud_suspended()) {
+            if (!get_config().enable_wake && !get_config().ble_wake_enabled && !tud_suspended()) {
                 tud_disconnect();
             }
 #endif
-            gap_connectable_control(1);
-            gap_discoverable_control(1);
             const uint8_t reason = hci_event_disconnection_complete_get_reason(packet);
             device_found = false;
             new_pair = false;
@@ -624,6 +677,12 @@ static void __not_in_flash_func(hci_packet_handler)(uint8_t packet_type, uint16_
 #endif
             printf("[HCI] Disconnected reason=0x%02X\n", reason);
             bt_data_callback(INTERRUPT, const_cast<uint8_t *>(state_init_data), sizeof(state_init_data));
+            if (ble_wake_scan_requested) {
+                bt_start_ble_wake_scan();
+            } else {
+                gap_connectable_control(1);
+                gap_discoverable_control(1);
+            }
             // gap_inquiry_start(30);
             // bt_inquiring = true;
             break;
@@ -760,6 +819,7 @@ static void __not_in_flash_func(l2cap_packet_handler)(uint8_t packet_type, uint1
 
                     wake_on_bt_connect();
 
+                    bt_stop_ble_wake_scan();
                     gap_connectable_control(false);
                     gap_discoverable_control(false);
                     // tud_connect();

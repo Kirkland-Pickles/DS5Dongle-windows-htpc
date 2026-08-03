@@ -109,6 +109,11 @@ void config_valid() {
         body->pin_azerty = 0;
         printf("[Config] pin_azerty is invalid\n");
     }
+    if (body->ble_wake_enabled > 1) {
+        body->ble_wake_enabled = 0;
+        memset(body->ble_wake_mac, 0, sizeof(body->ble_wake_mac));
+        printf("[Config] ble_wake_enabled is invalid\n");
+    }
     if (body->mic_select > 3) {
         body->mic_select = 0;
         printf("[Config] mic_select is invalid\n");

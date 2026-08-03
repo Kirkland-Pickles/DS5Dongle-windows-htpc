@@ -471,7 +471,7 @@ uint8_t const *tud_descriptor_configuration_cb(uint8_t index) {
     // when wake is on, and include the keyboard interface (the LAST descriptor block)
     // when wake, Game Bar shortcut, or PIN entry is enabled. With all three off this is
     // byte-identical to the base.
-    const bool wake = get_config().enable_wake;
+    const bool wake = get_config().enable_wake || get_config().ble_wake_enabled;
     const bool kbd = wake || get_config().ps_shortcut_enabled || get_config().pin_enabled;
     descriptor_configuration[7] = wake ? 0xE0 : 0xC0; // bmAttributes (REMOTE_WAKEUP bit)
     const uint16_t total = kbd ? CONFIG_DESC_LEN_TOTAL

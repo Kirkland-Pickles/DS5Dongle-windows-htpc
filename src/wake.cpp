@@ -168,11 +168,23 @@ void wake_on_bt_connect(void) {
     }
 }
 
+void wake_on_ble_target_detected(void) {
+    critical_section_enter_blocking(&wake_cs);
+    const bool should_wake = host_suspended &&
+        (state == WAKE_IDLE || state == WAKE_DONE || state == WAKE_PENDING_PRESS);
+    critical_section_exit(&wake_cs);
+
+    if (should_wake) {
+        request_host_wake("BLE advertisement");
+    }
+}
+
 extern "C" void tud_resume_cb(void) {
     WAKE_DBG("tud_resume_cb state=%s", wake_state_name(state));
     host_suspended = false;
     host_resumed_event = true;
     suspend_at_us = 0;   // resumed before the debounce elapsed -> cancel the disconnect
+    bt_stop_ble_wake_scan();
 }
 
 extern "C" void tud_mount_cb(void) {
@@ -181,6 +193,7 @@ extern "C" void tud_mount_cb(void) {
     host_resumed_event = true;
     suspend_at_us = 0;
     reconnect_until_us = 0;   // reconnect finished re-enumerating; end the grace early
+    bt_stop_ble_wake_scan();
 }
 
 void wake_on_bt_input(const uint8_t *hid_input, uint16_t len) {
@@ -240,12 +253,13 @@ void wake_task(void) {
     if (suspend_at_us != 0 && host_suspended &&
         now - suspend_at_us >= WAKE_DISCONNECT_DEBOUNCE_US) {
         bt_disconnect();
+        bt_start_ble_wake_scan();
         suspend_at_us = 0;
         WAKE_DBG("suspend debounce elapsed -> bt_disconnect()");
     }
 
     // The wake-UP FSM below only runs when wake is enabled.
-    if (!get_config().enable_wake) return;
+    if (!get_config().enable_wake && !get_config().ble_wake_enabled) return;
 
     critical_section_enter_blocking(&wake_cs);
     const wake_state_t s = state;
