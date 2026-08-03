@@ -1,11 +1,12 @@
-:: this cmd removes stale dualSense device entries. run as admin or double click to run and grant access
+:: this file exists to flush out old dualsense entries, fixing issues
+@echo off
 setlocal
-title ds5-clear-cache
+title DualSense Device Cache Cleaner
 set "SELF=%~f0"
 
 fltmc >nul 2>&1
 if errorlevel 1 (
-    powershell.exe -NoProfile -Command "Start-Process -FilePath '%SELF%' -Verb RunAs"
+    powershell.exe -NoProfile -Command "Start-Process -FilePath $env:SELF -Verb RunAs"
     exit /b
 )
 
@@ -14,16 +15,16 @@ exit /b
 
 :__POWERSHELL__
 $pattern = 'VID_054C&PID_0(CE6|DF2)'
-$pnputil = "$env:SystemRoot\System32\pnputil.exe"
 
 try {
-    $controllers = Get-PnpDevice -PresentOnly -ErrorAction Stop |
-        Where-Object { $_.InstanceId -match $pattern -or $_.FriendlyName -match 'DualSense' }
-
-    $audio = Get-PnpDevice -Class AudioEndpoint -PresentOnly -ErrorAction Stop |
-        Where-Object { $_.FriendlyName -match 'DualSense|Wireless Controller' }
-
-    $devices = @($controllers) + @($audio) | Sort-Object InstanceId -Unique
+    $devices = @(
+        Get-PnpDevice -ErrorAction Stop |
+            Where-Object {
+                $_.InstanceId -match $pattern -or
+                $_.FriendlyName -match 'DualSense'
+            } |
+            Sort-Object InstanceId -Unique
+    )
 } catch {
     Write-Host ""
     Write-Host "Could not enumerate Plug and Play devices:" -ForegroundColor Red
@@ -41,38 +42,29 @@ if ($devices.Count -eq 0) {
     return
 }
 
-Write-Host ""
-Write-Host "Found $($devices.Count) device entr$(if ($devices.Count -eq 1) {'y'} else {'ies'}):"
-$devices | ForEach-Object { Write-Host "  $($_.FriendlyName) [$($_.InstanceId)]" }
-Write-Host ""
-
 $removed = 0
 $failed = @()
 
 foreach ($device in $devices) {
-    try {
-        Remove-PnpDevice -InstanceId $device.InstanceId -Confirm:$false -ErrorAction Stop
+    pnputil.exe /remove-device "$($device.InstanceId)" | Out-Null
+
+    if ($LASTEXITCODE -eq 0) {
         $removed++
-    } catch {
-        $output = & $pnputil /remove-device "$($device.InstanceId)" 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            $removed++
-        } else {
-            $failed += [PSCustomObject]@{ Device = $device; Output = ($output -join ' ') }
-        }
+    } else {
+        $failed += $device
     }
 }
 
-& $pnputil /scan-devices | Out-Null
+pnputil.exe /scan-devices | Out-Null
 
+Write-Host ""
 Write-Host "Removed $removed of $($devices.Count) DualSense device entries."
 
 if ($failed.Count -gt 0) {
     Write-Host ""
     Write-Host "Could not remove:" -ForegroundColor Yellow
-    foreach ($f in $failed) {
-        Write-Host "  $($f.Device.FriendlyName) [$($f.Device.InstanceId)]"
-        Write-Host "    pnputil: $($f.Output)" -ForegroundColor DarkYellow
+    $failed | ForEach-Object {
+        Write-Host "  $($_.FriendlyName) [$($_.InstanceId)]"
     }
 }
 
