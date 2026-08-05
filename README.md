@@ -1,3 +1,16 @@
+> This fork adds 2 Home Theatre PC centric features to the DS5 Dongle firmware.
+> 
+> Current additions:
+> - Windows PIN auto-entry via controller combo (Hold D-pad Left + Circle + L1 + R1). 4-digit PIN only.
+> - Passive BLE scanning to enable wake from other devices (e.g., Xbox controller, BT keyboard/mouse - wakes PC through the Pico).
+> 
+> Get the build from [Releases](https://github.com/Kirkland-Pickles/DS5Dongle-windows-htpc/releases).
+> 
+> Use this modified web config to manage these features:
+> https://kirkland-pickles.github.io/ds5dongle-config-web/
+
+---
+
 # Pico2W DualSense 5 Bridge
 
 [中文](./README.CN.md)
