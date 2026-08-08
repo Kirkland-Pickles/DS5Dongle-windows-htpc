@@ -72,6 +72,9 @@ static int8_t bt_rssi = 0;
 static bool ble_wake_scan_requested = false;
 static bool ble_wake_scan_active = false;
 static bool hci_stack_working = false;
+static uint32_t ble_wake_phase_started_us = 0;
+static constexpr uint32_t BLE_WAKE_CLASSIC_PHASE_US = 900000;
+static constexpr uint32_t BLE_WAKE_BLE_PHASE_US = 100000;
 unordered_map<uint8_t, vector<uint8_t> > feature_data;
 queue_t send_fifo;
 
@@ -136,11 +139,11 @@ void bt_start_ble_wake_scan() {
         gap_inquiry_stop();
         bt_inquiring = false;
     }
-    gap_connectable_control(0);
-    gap_discoverable_control(0);
-    gap_set_scan_parameters(1, 0x0030, 0x0030);
-    gap_start_scan();
-    ble_wake_scan_active = true;
+    gap_set_page_scan_activity(0x0012, 0x0012);
+    gap_connectable_control(1);
+    gap_discoverable_control(1);
+    ble_wake_scan_active = false;
+    ble_wake_phase_started_us = time_us_32();
     printf("[BLE WAKE] Scanning for %s\n", bd_addr_to_str(get_config().ble_wake_mac));
 }
 
@@ -151,12 +154,41 @@ void bt_stop_ble_wake_scan() {
         ble_wake_scan_active = false;
         printf("[BLE WAKE] Scan stopped\n");
     }
+    ble_wake_phase_started_us = 0;
+    gap_set_page_scan_activity(0x0012, 0x0012);
     if (hci_stack_working) {
         const bool classic_connected =
             acl_handle != HCI_CON_HANDLE_INVALID || bt_is_connected();
         gap_connectable_control(classic_connected ? 0 : 1);
         gap_discoverable_control(classic_connected ? 0 : 1);
     }
+}
+
+static void bt_wake_scan_tick() {
+    if (!ble_wake_scan_requested || !hci_stack_working ||
+        acl_handle != HCI_CON_HANDLE_INVALID || bt_is_connected() ||
+        ble_wake_phase_started_us == 0) {
+        return;
+    }
+
+    const uint32_t now = time_us_32();
+    const uint32_t phase_us = ble_wake_scan_active
+        ? BLE_WAKE_BLE_PHASE_US : BLE_WAKE_CLASSIC_PHASE_US;
+    if (static_cast<uint32_t>(now - ble_wake_phase_started_us) < phase_us) return;
+
+    if (!ble_wake_scan_active) {
+        gap_connectable_control(0);
+        gap_discoverable_control(0);
+        gap_set_scan_parameters(0, 0x0030, 0x0030);
+        gap_start_scan();
+        ble_wake_scan_active = true;
+    } else {
+        gap_stop_scan();
+        ble_wake_scan_active = false;
+        gap_connectable_control(1);
+        gap_discoverable_control(1);
+    }
+    ble_wake_phase_started_us = now;
 }
 
 void bt_get_signal_strength(int8_t *rssi) {
@@ -376,6 +408,7 @@ void bt_bootsel_hold_action() {
 }
 
 void bt_inquiring_led() {
+    bt_wake_scan_tick();
     // BOOTSEL clear-confirmation triple-flash takes priority over inquiry blink
     if (bt_clear_flash_toggles_remaining > 0) {
         uint32_t now = to_ms_since_boot(get_absolute_time());
