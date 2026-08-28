@@ -1,4 +1,4 @@
-> This fork adds 2 Home Theatre PC centric features to the DS5 Dongle firmware.
+> This fork adds 2 HTPC features to the DS5 Dongle firmware.
 > 
 > Current additions:
 > - Windows PIN auto-entry via controller combo (Hold D-pad Left + Circle + L1 + R1). 4-digit PIN only.
